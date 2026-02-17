@@ -1,0 +1,49 @@
+[{1 :danymat/neogen
+  :config (fn []
+            (let [neogen_utils_nodes (require :neogen.utilities.nodes)
+                  neogen_utils_extractors (require :neogen.utilities.extractors)
+                  template (require :neogen.template)
+                  i (. (require :neogen.types.template) :item)
+                  annotation [[nil "/**"]
+                              [nil " * @notice $1"]
+                              [(. i :Parameter) " * @param %s: $1"]
+                              [(. i :Return) " * @return %s: $1"]
+                              [(. i :ReturnAnonym) " * @return $1"]
+                              [nil " */"]]
+                  languages {:solidity {:parent {:func [:function_definition]}
+                                        :data {:func {}}
+                                        :template (template:add_custom_annotation "natspec" annotation true)}}
+                  solidity (. languages :solidity)
+                  func-data (. (. solidity :data) :func)
+                  function-definition {}
+                  extract-fn (fn [node]
+                               (let [tree [{:retrieve :all
+                                            :node_type :parameter
+                                            :subtree [{:retrieve :first
+                                                       :node_type :type_name
+                                                       :extract true}
+                                                      {:retrieve :first
+                                                       :node_type :identifier
+                                                       :extract true}]}
+                                           {:retrieve :first
+                                            :node_type :return_type_definition
+                                            :subtree [{:retrieve :all
+                                                       :node_type :parameter
+                                                       :subtree [{:retrieve :first
+                                                                  :node_type :type_name
+                                                                  :extract true
+                                                                  :as :return_type_name}
+                                                                 {:retrieve :first
+                                                                  :node_type :identifier
+                                                                  :extract true
+                                                                  :as :return_type_identifier}]}]}]
+                                     nodes (neogen_utils_nodes:matching_nodes_from node tree)
+                                     res (neogen_utils_extractors:extract_from_matched nodes)]
+                                 (vim.print nodes res)
+                                 {:parameters (. res :identifier)
+                                  :return_anonym (. res :return_type_name)}))
+              (set (. function-definition "0") {:extract extract-fn})
+              (set (. func-data :function_definition) function-definition)
+              ((. (require :neogen) :setup)
+               {:snippet_engine :luasnip
+                :languages languages}))}]

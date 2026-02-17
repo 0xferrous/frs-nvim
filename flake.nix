@@ -1,0 +1,381 @@
+{
+  description = "Portable Neovim wrapper config";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+    nix-wrapper-modules = {
+      url = "github:BirdeeHub/nix-wrapper-modules";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Missing plugins from nixpkgs: packaged via flake inputs + buildVimPlugin.
+    plugin-ansi-nvim = {
+      url = "github:0xferrous/ansi.nvim";
+      flake = false;
+    };
+    plugin-eth-nvim = {
+      url = "github:0xferrous/eth.nvim";
+      flake = false;
+    };
+    plugin-vim-circom-syntax = {
+      url = "github:iden3/vim-circom-syntax";
+      flake = false;
+    };
+    plugin-flote = {
+      url = "github:JellyApple102/flote.nvim";
+      flake = false;
+    };
+    plugin-feed-nvim = {
+      url = "github:neo451/feed.nvim";
+      flake = false;
+    };
+    plugin-nightsky-vim = {
+      url = "github:nvimdev/nightsky.vim";
+      flake = false;
+    };
+    plugin-mcphub-nvim = {
+      url = "github:ravitemer/mcphub.nvim";
+      flake = false;
+    };
+    plugin-logger-nvim = {
+      url = "github:rmagatti/logger.nvim";
+      flake = false;
+    };
+    plugin-toggleterm-manager = {
+      url = "github:ryanmsnyder/toggleterm-manager.nvim";
+      flake = false;
+    };
+    plugin-stickybuf-nvim = {
+      url = "github:stevearc/stickybuf.nvim";
+      flake = false;
+    };
+    plugin-floating-help = {
+      url = "github:Tyler-Barham/floating-help.nvim";
+      flake = false;
+    };
+    plugin-luarocks-nvim = {
+      url = "github:vhyrro/luarocks.nvim";
+      flake = false;
+    };
+    plugin-neotest-foundry = {
+      url = "github:llllvvuu/neotest-foundry";
+      flake = false;
+    };
+  };
+
+  outputs =
+    inputs@{
+      self,
+      nixpkgs,
+      nix-wrapper-modules,
+      ...
+    }:
+    let
+      lib = nixpkgs.lib;
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "x86_64-darwin"
+        "aarch64-darwin"
+      ];
+      forAllSystems = lib.genAttrs systems;
+    in
+    {
+      packages = forAllSystems (
+        system:
+        let
+          pkgs = import nixpkgs { inherit system; };
+
+          mkPluginFromInput =
+            pname: inputName:
+            pkgs.vimUtils.buildVimPlugin {
+              inherit pname;
+              src = builtins.getAttr inputName inputs;
+              version = toString ((builtins.getAttr inputName inputs).lastModifiedDate or "master");
+              doCheck = false;
+            };
+
+          customVimPlugins = {
+            ansi-nvim = mkPluginFromInput "ansi.nvim" "plugin-ansi-nvim";
+            eth-nvim = mkPluginFromInput "eth.nvim" "plugin-eth-nvim";
+            vim-circom-syntax = mkPluginFromInput "vim-circom-syntax" "plugin-vim-circom-syntax";
+            flote-nvim = mkPluginFromInput "flote.nvim" "plugin-flote";
+            feed-nvim = mkPluginFromInput "feed.nvim" "plugin-feed-nvim";
+            nightsky-vim = mkPluginFromInput "nightsky.vim" "plugin-nightsky-vim";
+            mcphub-nvim = mkPluginFromInput "mcphub.nvim" "plugin-mcphub-nvim";
+            logger-nvim = mkPluginFromInput "logger.nvim" "plugin-logger-nvim";
+            toggleterm-manager-nvim = mkPluginFromInput "toggleterm-manager.nvim" "plugin-toggleterm-manager";
+            stickybuf-nvim = mkPluginFromInput "stickybuf.nvim" "plugin-stickybuf-nvim";
+            floating-help-nvim = mkPluginFromInput "floating-help.nvim" "plugin-floating-help";
+            luarocks-nvim = mkPluginFromInput "luarocks.nvim" "plugin-luarocks-nvim";
+            neotest-foundry-nvim = mkPluginFromInput "neotest-foundry" "plugin-neotest-foundry";
+          };
+
+          compiledConfig =
+            pkgs.runCommand "nvim-config-compiled"
+              {
+                nativeBuildInputs = [
+                  pkgs.neovim-unwrapped
+                  pkgs.vimPlugins.hotpot-nvim
+                ];
+              }
+              ''
+                cp -r ${./.} $out
+                chmod -R u+w $out
+
+                # Hotpot needs writable HOME/XDG_CACHE_HOME during headless compilation.
+                export HOME="$(mktemp -d)"
+                export XDG_CACHE_HOME="$HOME/.cache"
+                mkdir -p "$XDG_CACHE_HOME"
+
+                ${pkgs.neovim-unwrapped}/bin/nvim \
+                  --headless \
+                  --clean \
+                  -u NONE \
+                  --cmd "set rtp+=${pkgs.vimPlugins.hotpot-nvim}" \
+                  "+lua require('hotpot').api.make.auto.build('$out', {verbose=true, force=true})" \
+                  +qa
+
+                # Fail the build if compilation did not produce expected artifacts.
+                test -f "$out/.compiled/lua/init.lua"
+                test -f "$out/.compiled/lua/cfg/init.lua"
+
+                # For portable runtime: avoid requiring hotpot at startup.
+                # We only need hotpot at build-time, after compilation is done.
+                cat > "$out/init.lua" <<EOF
+                package.path = "$out/lua/?.lua;$out/lua/?/init.lua;" .. package.path
+                vim.opt.rtp:prepend("$out/.compiled")
+                vim.loader.enable()
+                dofile("$out/.compiled/lua/cfg/init.lua")
+                EOF
+              '';
+
+          wrappedNvim = nix-wrapper-modules.lib.evalPackage [
+            (
+              { wlib, ... }:
+              {
+                imports = [ wlib.wrapperModules.neovim ];
+
+                binName = "nvim";
+
+                settings = {
+                  config_directory = compiledConfig;
+                  aliases = [
+                    "vi"
+                    "vim"
+                  ];
+                };
+
+                # Install plugins from nixpkgs rather than downloading at runtime.
+                # Keep packages in /opt and let lze drive loading behavior.
+                specs.nixpkgs = {
+                  lazy = true;
+                  pluginDeps = false;
+                  collateGrammars = false;
+                  data = with pkgs.vimPlugins; [
+                    FixCursorHold-nvim
+                    tabular
+                    aw-watcher-nvim
+                    aw-watcher-vim
+                    blink-cmp
+                    blink-compat
+                    catppuccin-nvim
+                    codecompanion-nvim
+                    comment-nvim
+                    conform-nvim
+                    conflict-marker-vim
+                    crates-nvim
+                    dropbar-nvim
+                    fidget-nvim
+                    firenvim
+                    friendly-snippets
+                    vim-fugitive
+                    gitlinker-nvim
+                    gitsigns-nvim
+                    goto-preview
+                    gruvbox
+                    gruvbox-material
+                    harpoon2
+                    hop-nvim
+                    hotpot-nvim
+                    iceberg-vim
+                    kanagawa-nvim
+                    kitty-scrollback-nvim
+                    lualine-nvim
+                    mini-diff
+                    mini-icons
+                    mini-nvim
+                    neo-tree-nvim
+                    neodev-nvim
+                    neorg
+                    neotest
+                    night-owl-nvim
+                    nvim-autopairs
+                    nvim-lspconfig
+                    nvim-luapad
+                    nvim-nio
+                    nvim-paredit
+                    nvim-pqf
+                    nvim-treesitter
+                    nvim-treesitter-textobjects
+                    nvim-ufo
+                    nvim-web-devicons
+                    nui-nvim
+                    octo-nvim
+                    oil-nvim
+                    orgmode
+                    overseer-nvim
+                    oxocarbon-nvim
+                    plenary-nvim
+                    promise-async
+                    rainbow-delimiters-nvim
+                    render-markdown-nvim
+                    rose-pine
+                    rustaceanvim
+                    vim-sleuth
+                    snacks-nvim
+                    supermaven-nvim
+                    symbols-outline-nvim
+                    vim-table-mode
+                    telescope-fzf-native-nvim
+                    telescope-nvim
+                    telescope-project-nvim
+                    telescope-ui-select-nvim
+                    telescope-undo-nvim
+                    todo-comments-nvim
+                    tokyonight-nvim
+                    toggleterm-nvim
+                    trouble-nvim
+                    venn-nvim
+                    vim-be-good
+                    vim-eunuch
+                    vim-illuminate
+                    vim-matchup
+                    vim-startuptime
+                    vim-unimpaired
+                    which-key-nvim
+                    yats-vim
+                    yuck-vim
+                    zk-nvim
+                  ];
+                };
+
+                specs.custom = {
+                  lazy = true;
+                  pluginDeps = false;
+                  collateGrammars = false;
+                  data = builtins.attrValues customVimPlugins;
+                };
+
+                # lze drives runtime lazy behavior, so it must be available at startup.
+                specs.lze = {
+                  data = pkgs.vimPlugins.lze;
+                  lazy = false;
+                };
+
+                # Runtime helpers + LSP servers for a self-contained wrapped Neovim.
+                extraPackages = with pkgs; [
+                  git
+                  fd
+                  ripgrep
+
+                  # LSP/tooling used by configured servers
+                  gopls
+                  lua-language-server
+                  typescript
+                  typescript-language-server
+                  ccls
+                  marksman
+                  zls
+                ];
+              }
+            )
+            { inherit pkgs; }
+          ];
+
+          smoke = pkgs.writeShellScriptBin "nvim-smoke" ''
+            set -euo pipefail
+            tmp="$(mktemp -d)"
+            trap 'rm -rf "$tmp"' EXIT
+            export XDG_CACHE_HOME="$tmp/cache"
+            export XDG_STATE_HOME="$tmp/state"
+            export XDG_DATA_HOME="$tmp/data"
+            exec ${wrappedNvim}/bin/nvim --headless "+luafile ${./scripts/smoke-lazy.lua}"
+          '';
+
+          live = pkgs.writeShellScriptBin "nvim-live" ''
+            set -euo pipefail
+
+            root="''${NVIM_LIVE_CONFIG_ROOT:-$PWD}"
+            if [ ! -f "$root/init.lua" ] && [ ! -f "$root/init.fnl" ]; then
+              echo "nvim-live: expected init.lua or init.fnl in config root: $root" >&2
+              echo "Set NVIM_LIVE_CONFIG_ROOT to override (e.g. repo root)." >&2
+              exit 1
+            fi
+
+            tmp="$(mktemp -d)"
+            trap 'rm -rf "$tmp"' EXIT
+
+            export HOME="''${NVIM_LIVE_HOME:-$tmp/home}"
+            export XDG_CACHE_HOME="''${XDG_CACHE_HOME:-$tmp/cache}"
+            export XDG_STATE_HOME="''${XDG_STATE_HOME:-$tmp/state}"
+            export XDG_DATA_HOME="''${XDG_DATA_HOME:-$tmp/data}"
+            mkdir -p "$HOME" "$XDG_CACHE_HOME" "$XDG_STATE_HOME" "$XDG_DATA_HOME"
+
+            export PATH="${lib.makeBinPath [ pkgs.git pkgs.fd pkgs.ripgrep ]}:$PATH"
+            export NVIM_LIVE_CONFIG_ROOT="$root"
+
+            cat > "$tmp/init.lua" <<'EOF'
+            local root = os.getenv("NVIM_LIVE_CONFIG_ROOT")
+            if not root or root == "" then
+              root = vim.fn.getcwd()
+            end
+
+            package.path = root .. "/lua/?.lua;" .. root .. "/lua/?/init.lua;" .. package.path
+            vim.opt.rtp:prepend(root)
+            vim.loader.enable()
+
+            require("hotpot")
+            require("cfg")
+            EOF
+
+            exec ${wrappedNvim}/bin/nvim \
+              --cmd "set rtp+=${pkgs.vimPlugins.hotpot-nvim}" \
+              -u "$tmp/init.lua" \
+              "$@"
+          '';
+        in
+        {
+          nvim = wrappedNvim;
+          smoke = smoke;
+          live = live;
+          default = wrappedNvim;
+        }
+      );
+
+      apps = forAllSystems (
+        system:
+        let
+          pkg = self.packages.${system}.default;
+          smoke = self.packages.${system}.smoke;
+          live = self.packages.${system}.live;
+        in
+        {
+          nvim = {
+            type = "app";
+            program = "${pkg}/bin/nvim";
+          };
+          smoke = {
+            type = "app";
+            program = "${smoke}/bin/nvim-smoke";
+          };
+          live = {
+            type = "app";
+            program = "${live}/bin/nvim-live";
+          };
+          default = self.apps.${system}.nvim;
+        }
+      );
+    };
+}
