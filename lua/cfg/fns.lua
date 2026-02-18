@@ -243,6 +243,7 @@ local MODULE_ON_REQUIRE = {
   ["olimorris/codecompanion.nvim"] = { "codecompanion" },
   ["folke/which-key.nvim"] = { "which-key" },
   ["nvim-treesitter/nvim-treesitter"] = { "nvim-treesitter" },
+  ["saghen/blink.compat"] = { "blink.compat", "blink.compat.source" },
 }
 
 local PACK_NAME_OVERRIDES = {

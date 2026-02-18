@@ -153,6 +153,14 @@ Live/dev mode (uses your working tree config with hotpot at runtime):
 nix run ./nvim#live
 ```
 
+Containerized test run (via `justfile`):
+
+```bash
+just test
+```
+
+This target runs the config inside `localhost/agent-box:latest` with Podman, mounting the repo read-only and writing Neovim messages to `/tmp/frs-nvim/messages.log` on the host. Use this when you want a reproducible sandboxed run and an easy log file to inspect.
+
 `#live` defaults to `$PWD` as the config root. Override with:
 
 ```bash

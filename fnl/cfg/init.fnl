@@ -121,6 +121,15 @@
                                       (vim.api.nvim_win_set_buf 0 b)))
                                   {:desc "Highlights ANSI termcodes in curbuf"})
 
+(vim.api.nvim_create_user_command :WriteMessagesToFile
+                                  (fn []
+                                    (let [out (. (vim.api.nvim_exec2 :messages {:output true}) :output)
+                                          path :/tmp/frs-nvim/messages.log]
+                                      (vim.fn.mkdir :/tmp/frs-nvim :p)
+                                      (vim.fn.writefile (vim.split out "\n") path)
+                                      (vim.notify (.. "Wrote :messages to " path))))
+                                  {:desc "Write :messages output to /tmp/frs-nvim/messages.log"})
+
 ; setup plugins via nix-provided runtime paths (no runtime package manager)
 (log "Before requiring nix plugin loader")
 (let [loader (require :cfg.fns)]
