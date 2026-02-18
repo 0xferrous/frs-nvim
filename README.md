@@ -107,6 +107,8 @@ The flake exports:
 
 `nix run` uses `apps.<system>.default` and launches `${pkg}/bin/nvim`.
 
+For Home Manager compatibility, `packages.<system>.nvim` also exposes a `lua` attribute (`packages.<system>.nvim.lua`), mirroring `neovim-unwrapped.lua`.
+
 ## Supported systems
 
 Configured for:

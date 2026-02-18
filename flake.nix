@@ -183,7 +183,7 @@
                 EOF
               '';
 
-          wrappedNvim = nix-wrapper-modules.lib.evalPackage [
+          wrappedNvimBase = nix-wrapper-modules.lib.evalPackage [
             (
               { wlib, ... }:
               {
@@ -329,6 +329,11 @@
             { inherit pkgs; }
           ];
 
+          # Home Manager's Neovim module expects package.lua (like neovim-unwrapped.lua).
+          wrappedNvim = wrappedNvimBase // {
+            lua = pkgs.neovim-unwrapped.lua;
+          };
+
           smoke = pkgs.writeShellScriptBin "nvim-smoke" ''
             set -euo pipefail
             tmp="$(mktemp -d)"
@@ -380,6 +385,7 @@
               -u "$tmp/init.lua" \
               "$@"
           '';
+
         in
         {
           nvim = wrappedNvim;
