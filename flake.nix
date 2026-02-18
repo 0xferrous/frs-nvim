@@ -112,6 +112,38 @@
             neotest-foundry-nvim = mkPluginFromInput "neotest-foundry" "plugin-neotest-foundry";
           };
 
+          supermavenMeta =
+            {
+              x86_64-linux = {
+                url = "https://supermaven-public.s3.amazonaws.com/sm-agent/v2/8/linux-musl/x86_64/sm-agent";
+                hash = "sha256-lsaS7IoNQUIkTL1Qo+UymeD8y4eX4mPR6XFC2qMlp4g=";
+              };
+              aarch64-linux = {
+                url = "https://supermaven-public.s3.amazonaws.com/sm-agent/v2/8/linux-musl/aarch64/sm-agent";
+                hash = "sha256-FXot8/QnrInCiJP+a+SnMOOOmCv1BHEwP9T58bXqe98=";
+              };
+              x86_64-darwin = {
+                url = "https://supermaven-public.s3.amazonaws.com/sm-agent/v2/8/darwin/x86_64/sm-agent";
+                hash = "sha256-ZUK4h3oAp1KWXhhJDE502v1jlhGLzV452u2W1z+IXK0=";
+              };
+              aarch64-darwin = {
+                url = "https://supermaven-public.s3.amazonaws.com/sm-agent/v2/8/darwin/aarch64/sm-agent";
+                hash = "sha256-wocLx/s6h98HNDVmUH3HV/oZOb9WgiIeTteZ1FzG3rc=";
+              };
+            }
+            .${system};
+
+          supermaven-agent =
+            pkgs.runCommand "supermaven-agent"
+              {
+                src = pkgs.fetchurl {
+                  inherit (supermavenMeta) url hash;
+                };
+              }
+              ''
+                install -Dm755 "$src" "$out/bin/sm-agent"
+              '';
+
           compiledConfig =
             pkgs.runCommand "nvim-config-compiled"
               {
@@ -288,6 +320,9 @@
                   ccls
                   marksman
                   zls
+
+                  # Packaged Supermaven agent binary (sm-agent)
+                  supermaven-agent
                 ];
               }
             )

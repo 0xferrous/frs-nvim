@@ -75,11 +75,20 @@ So plugin code is provided by Nix store paths rather than runtime git clones, wi
 
 Runtime behavior is handled by `lze` via `lua/cfg/fns.lua` (`setup_nix_plugins`), translating the existing lazy-style plugin specs into lze triggers (`event/cmd/ft/keys/on_require`).
 
-PATH helpers:
+PATH helpers and runtime tools are injected via `extraPackages` (e.g. `git`, `fd`, `ripgrep`, LSP binaries, and `sm-agent`).
 
-- `git`
-- `fd`
-- `ripgrep`
+### 4.1) Supermaven `sm-agent` patching
+
+`supermaven-nvim` normally downloads `sm-agent` on first run into its local cache path.
+
+This flake instead packages `sm-agent` in Nix (`supermaven-agent`) and exposes it in PATH. On startup, `fnl/plugins/supermaven.fnl`:
+
+1. Resolves packaged `sm-agent` from PATH
+2. Asks Supermaven where it expects the local binary (`binary_fetcher:local_binary_path()`)
+3. Copies packaged `sm-agent` there if missing
+4. Marks it executable
+
+So Supermaven still works with its expected local layout, but without runtime network download.
 
 This keeps your current lazy-based flow usable in the packaged runtime.
 
