@@ -9,7 +9,6 @@
                 :nushell {}
                 :marksman {}
                 ; TODO: configure Solidity LSP
-                :noir {}
                 :zls {}})
 
 (fn configure_lsp_servers [servers]

@@ -19,3 +19,6 @@ test:
 		-ti --rm \
 		localhost/agent-box:latest \
 		sh -lc 'mkdir -p /tmp/work-nvim && (cd /frs-nvim && tar --exclude=.jj -cf - .) | (cd /tmp/work-nvim && tar -xf -) && nix --extra-experimental-features nix-command --extra-experimental-features flakes run path:/tmp/work-nvim'
+
+smoke-lsp:
+	nix run .#smoke-lsp
