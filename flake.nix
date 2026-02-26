@@ -287,7 +287,7 @@
                         nvim-nio
                         nvim-paredit
                         nvim-pqf
-                        nvim-treesitter
+                        (nvim-treesitter.withAllGrammars)
                         nvim-treesitter-textobjects
                         nvim-ufo
                         nvim-web-devicons
