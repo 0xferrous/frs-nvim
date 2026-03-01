@@ -459,6 +459,59 @@ local function load_triggers_present(spec)
     or spec.on_require ~= nil
 end
 
+local function is_plugin_spec(value)
+  return type(value) == "table" and (type(value[1]) == "string" or type(value.name) == "string")
+end
+
+local function ensure_dependency_specs(all_specs)
+  local out = {}
+  local seen = {}
+  local anon_idx = 0
+
+  local function spec_key(spec)
+    if type(spec.name) == "string" and spec.name ~= "" then
+      return "name:" .. spec.name
+    end
+    if type(spec[1]) == "string" and spec[1] ~= "" then
+      return "repo:" .. spec[1]
+    end
+    anon_idx = anon_idx + 1
+    return "anon:" .. tostring(anon_idx)
+  end
+
+  local function add_spec(spec)
+    if type(spec) ~= "table" then
+      return
+    end
+
+    local key = spec_key(spec)
+    if seen[key] then
+      return
+    end
+    seen[key] = true
+    table.insert(out, spec)
+
+    local deps = spec.dependencies
+    if type(deps) ~= "table" then
+      return
+    end
+
+    for _, dep in ipairs(deps) do
+      if type(dep) == "string" then
+        add_spec({ dep, lazy = true })
+      elseif is_plugin_spec(dep) then
+        add_spec(dep)
+      end
+    end
+  end
+
+  for _, spec in ipairs(all_specs) do
+    add_spec(spec)
+  end
+
+  return out
+end
+
 local function build_lze_specs(all_specs, known_plugins)
   local alias_to_id = {}
   local ordered = {}
@@ -482,6 +535,11 @@ local function build_lze_specs(all_specs, known_plugins)
     if short then
       alias_to_id[short] = id
     end
+  end
+
+  local load_name_by_id = {}
+  for _, entry in ipairs(ordered) do
+    load_name_by_id[entry.id] = entry.load_name
   end
 
   local dep_of_map = {}
@@ -532,6 +590,16 @@ local function build_lze_specs(all_specs, known_plugins)
       dep_of = dep_of_map[id],
       on_require = on_require,
       load = function(_)
+        local loaded_deps = {}
+        for _, ref in ipairs(dependency_refs(spec)) do
+          local dep_id = alias_to_id[ref]
+          local dep_load_name = dep_id and load_name_by_id[dep_id] or nil
+          if dep_id and dep_id ~= id and type(dep_load_name) == "string" and dep_load_name ~= "" and not loaded_deps[dep_load_name] then
+            loaded_deps[dep_load_name] = true
+            vim.cmd.packadd(dep_load_name)
+          end
+        end
+
         if type(load_name) ~= "string" or load_name == "" then
           vim.notify(("nix loader: no pack name for %s"):format(id), vim.log.levels.WARN)
           return
@@ -624,7 +692,7 @@ function M.setup_nix_plugins()
   local lze = require("lze")
   lze.h.event.set_event_alias("VeryLazy", "DeferredUIEnter")
 
-  local specs = build_lze_specs(all_specs, known_plugins)
+  local specs = build_lze_specs(ensure_dependency_specs(all_specs), known_plugins)
   lze.load(specs)
 end
 

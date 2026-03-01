@@ -33,6 +33,14 @@ for _, name in ipairs(targets) do
   ok("trigger_load(" .. name .. ")")
 end
 
+-- Regression test: dependencies declared under top-level specs must become loadable
+-- specs as well. rustaceanvim is declared as a dependency of nvim-lspconfig.
+local ok_rustacean, rustacean_err = pcall(require, "rustaceanvim")
+if not ok_rustacean then
+  fail(("dependency flatten/load failed for rustaceanvim: %s"):format(tostring(rustacean_err)))
+end
+ok("require(rustaceanvim)")
+
 local checks = {
   { "neotest", "neotest" },
   { "neotest-foundry", "neotest-foundry" },
