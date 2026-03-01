@@ -242,6 +242,7 @@ local MODULE_ON_REQUIRE = {
   ["zk-org/zk-nvim"] = { "zk" },
   ["olimorris/codecompanion.nvim"] = { "codecompanion" },
   ["folke/which-key.nvim"] = { "which-key" },
+  ["folke/snacks.nvim"] = { "snacks" },
   ["nvim-treesitter/nvim-treesitter"] = { "nvim-treesitter" },
   ["saghen/blink.compat"] = { "blink.compat", "blink.compat.source" },
 }
@@ -479,17 +480,25 @@ local function ensure_dependency_specs(all_specs)
     return "anon:" .. tostring(anon_idx)
   end
 
-  local function add_spec(spec)
+  local function push_if_new(spec)
     if type(spec) ~= "table" then
-      return
+      return false
     end
 
     local key = spec_key(spec)
     if seen[key] then
-      return
+      return false
     end
+
     seen[key] = true
     table.insert(out, spec)
+    return true
+  end
+
+  local function add_dependency_specs(spec)
+    if type(spec) ~= "table" then
+      return
+    end
 
     local deps = spec.dependencies
     if type(deps) ~= "table" then
@@ -497,16 +506,27 @@ local function ensure_dependency_specs(all_specs)
     end
 
     for _, dep in ipairs(deps) do
+      local dep_spec = nil
       if type(dep) == "string" then
-        add_spec({ dep, lazy = true })
+        dep_spec = { dep, lazy = true }
       elseif is_plugin_spec(dep) then
-        add_spec(dep)
+        dep_spec = dep
+      end
+
+      if dep_spec and push_if_new(dep_spec) then
+        add_dependency_specs(dep_spec)
       end
     end
   end
 
+  -- Keep canonical top-level specs first so dependency shims can't shadow them.
   for _, spec in ipairs(all_specs) do
-    add_spec(spec)
+    push_if_new(spec)
+  end
+
+  -- Then recursively append nested dependencies that are otherwise missing.
+  for _, spec in ipairs(all_specs) do
+    add_dependency_specs(spec)
   end
 
   return out
