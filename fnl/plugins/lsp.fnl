@@ -80,13 +80,6 @@
   :event [:BufReadPre :BufNewFile]
   :dependencies [{1 :j-hui/fidget.nvim
                   :opts {:notification {:window {:winblend 0}}}}
-                 {1 :folke/neodev.nvim
-                  ; NOTE: .nvim marker hack: force-enable neodev plugin library in this repo
-                  :opts {:override (fn [root_dir library]
-                                     (when (= (string.find root_dir :.nvim 1 true)
-                                              1)
-                                       (set (. library :enabled) true)
-                                       (set (. library :plugins) true)))}}
                  :mrcjkb/rustaceanvim
                  :saghen/blink.cmp
                  :saecki/crates.nvim]

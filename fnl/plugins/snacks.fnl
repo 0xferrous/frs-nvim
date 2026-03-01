@@ -71,44 +71,61 @@
          2 "<cmd>lua Snacks.scratch.select()<cr>"
          :desc "[S]earch [H]elp"}]
  :config (fn [opts]
-           (local snacks (require :snacks))
-           (snacks.setup opts.opts)
-           (vim.keymap.set :n :<leader>sh "<cmd>lua Snacks.picker.help()<cr>"
-                           {:desc "[S]earch [H]elp"})
-           (vim.keymap.set :n :<leader>sk
-                           "<cmd>lua Snacks.picker.keymaps()<cr>"
-                           {:desc "[S]earch [K]eymaps"})
-           (vim.keymap.set :n :<leader>sf "<cmd>lua Snacks.picker.files()<cr>"
-                           {:desc "[S]earch [F]iles"})
-           (vim.keymap.set :n :<leader>ss
-                           "<cmd>lua Snacks.picker.pickers()<cr>"
-                           {:desc "[S]earch [S]elect pickers"})
-           (vim.keymap.set :n :<leader>sw
-                           "<cmd>lua Snacks.picker.grep_word()<cr>"
-                           {:desc "[S]earch current [W]ord"})
-           (vim.keymap.set :n :<leader>sg "<cmd>lua Snacks.picker.grep()<cr>"
-                           {:desc "[S]earch by [G]rep"})
-           (vim.keymap.set :n :<leader>sd
-                           "<cmd>lua Snacks.picker.diagnostics()<cr>"
-                           {:desc "[S]earch [D]iagnostics"}) ; sde ; sdw
-           (vim.keymap.set :n :<leader>sr "<cmd>lua Snacks.picker.resume()<cr>"
-                           {:desc "[S]earch [R]esume"})
-           (vim.keymap.set :n :<leader>s. "<cmd>lua Snacks.picker.recent()<cr>"
-                           {:desc "[S]earch Recent Files (\".\" for repeat)"})
-           (vim.keymap.set :n :<leader>gf
-                           "<cmd>lua Snacks.picker.git_files()<cr>"
-                           {:desc "Search [G]it [F]iles"})
-           (vim.keymap.set :n :<leader><space>
-                           "<cmd>lua Snacks.picker.buffers({ filter = { cwd = true } })<cr>"
-                           {:desc "[ ] Find existing buffers"})
-           (vim.keymap.set :n :<leader>/ "<cmd>lua Snacks.picker.lines()<cr>"
-                           {:desc "[/] Fuzzily search in current buffer"})
-           (vim.keymap.set :n :<leader>s/
-                           "<cmd>lua Snacks.picker.grep_buffers()<cr>"
-                           {:desc "[S]earch [/] in Open Files"})
-           (vim.keymap.set :n :<leader>sn
-                           "<cmd>lua Snacks.picker.files( { cwd = vim.fn.stdpath(\"config\")  })<cr>"
-                           {:desc "[S]earch [N]eovim files"})
-           (vim.keymap.set :n :<leader>un
-                           "<cmd>lua Snacks.notifier.show_history()<cr>"
-                           {:desc "Show [N]otification history"}))}
+           (let [snacks (require :snacks)
+                 snacks_git (require :snacks.git)]
+             (snacks.setup opts.opts)
+             (vim.api.nvim_create_user_command :Notifications
+                                               (fn []
+                                                 (snacks.notifier.show_history))
+                                               {:desc "Show notifications history"
+                                                :force true})
+
+             (fn project_files []
+               (let [root (snacks_git.get_root)]
+                 (if root
+                     (snacks.picker.git_files {:cwd root
+                                               :untracked false
+                                               :layout {:preview false}})
+                     (snacks.picker.files {:layout {:preview false}}))))
+
+             (vim.keymap.set :n :<leader>sh "<cmd>lua Snacks.picker.help()<cr>"
+                             {:desc "[S]earch [H]elp"})
+             (vim.keymap.set :n :<leader>sk
+                             "<cmd>lua Snacks.picker.keymaps()<cr>"
+                             {:desc "[S]earch [K]eymaps"})
+             (vim.keymap.set :n :<leader>sf project_files
+                             {:desc "[S]earch [F]iles"})
+             (vim.keymap.set :n :<leader>ss
+                             "<cmd>lua Snacks.picker.pickers()<cr>"
+                             {:desc "[S]earch [S]elect pickers"})
+             (vim.keymap.set :n :<leader>sw
+                             "<cmd>lua Snacks.picker.grep_word()<cr>"
+                             {:desc "[S]earch current [W]ord"})
+             (vim.keymap.set :n :<leader>sg "<cmd>lua Snacks.picker.grep()<cr>"
+                             {:desc "[S]earch by [G]rep"})
+             (vim.keymap.set :n :<leader>sd
+                             "<cmd>lua Snacks.picker.diagnostics()<cr>"
+                             {:desc "[S]earch [D]iagnostics"}) ; sde ; sdw
+             (vim.keymap.set :n :<leader>sr
+                             "<cmd>lua Snacks.picker.resume()<cr>"
+                             {:desc "[S]earch [R]esume"})
+             (vim.keymap.set :n :<leader>s.
+                             "<cmd>lua Snacks.picker.recent()<cr>"
+                             {:desc "[S]earch Recent Files (\".\" for repeat)"})
+             (vim.keymap.set :n :<leader>gf
+                             "<cmd>lua Snacks.picker.git_files()<cr>"
+                             {:desc "Search [G]it [F]iles"})
+             (vim.keymap.set :n :<leader><space>
+                             "<cmd>lua Snacks.picker.buffers({ filter = { cwd = true } })<cr>"
+                             {:desc "[ ] Find existing buffers"})
+             (vim.keymap.set :n :<leader>/ "<cmd>lua Snacks.picker.lines()<cr>"
+                             {:desc "[/] Fuzzily search in current buffer"})
+             (vim.keymap.set :n :<leader>s/
+                             "<cmd>lua Snacks.picker.grep_buffers()<cr>"
+                             {:desc "[S]earch [/] in Open Files"})
+             (vim.keymap.set :n :<leader>sn
+                             "<cmd>lua Snacks.picker.files( { cwd = vim.fn.stdpath(\"config\")  })<cr>"
+                             {:desc "[S]earch [N]eovim files"})
+             (vim.keymap.set :n :<leader>un
+                             "<cmd>lua Snacks.notifier.show_history()<cr>"
+                             {:desc "Show [N]otification history"})))}
