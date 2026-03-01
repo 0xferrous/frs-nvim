@@ -79,21 +79,13 @@
                                                  (snacks.notifier.show_history))
                                                {:desc "Show notifications history"
                                                 :force true})
-
-             (fn project_files []
-               (let [root (snacks_git.get_root)]
-                 (if root
-                     (snacks.picker.git_files {:cwd root
-                                               :untracked false
-                                               :layout {:preview false}})
-                     (snacks.picker.files {:layout {:preview false}}))))
-
              (vim.keymap.set :n :<leader>sh "<cmd>lua Snacks.picker.help()<cr>"
                              {:desc "[S]earch [H]elp"})
              (vim.keymap.set :n :<leader>sk
                              "<cmd>lua Snacks.picker.keymaps()<cr>"
                              {:desc "[S]earch [K]eymaps"})
-             (vim.keymap.set :n :<leader>sf project_files
+             (vim.keymap.set :n :<leader>sf
+                             "<cmd>lua Snacks.picker.files()<cr>"
                              {:desc "[S]earch [F]iles"})
              (vim.keymap.set :n :<leader>ss
                              "<cmd>lua Snacks.picker.pickers()<cr>"
